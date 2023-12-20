@@ -129,7 +129,7 @@ def create_folder(source, path, client):
     try:
         client.put_object(Bucket=source, Key=path)
     except Exception as e:
-        print(f"[FAIL] {e}")
+        print(f"[FAIL]: {e} while creating folder {path}")
 
 def create_cwlogs(log_bucket, bucket_names):
     client = boto3.client('logs')
@@ -179,13 +179,32 @@ def enable_logs(root, prefix, target, client):
     except Exception as e:
           print(f"[FAIL] {e}")
 
+def create_lifecycle(log, names, prf, retention):
+	for b in names:
+		b = b.decode('utf-8').strip()
+		prefix = f"{prf}/{b}/"
+		lifecycle.append({'Expiration': {'Days': retention},'Filter': {'Prefix': prefix},'ID': b,'Status': 'Enabled',},)
+
+	s3.put_bucket_lifecycle_configuration(
+		Bucket=log,
+		LifecycleConfiguration={
+			'Rules': lifecycle,
+		},
+	)
+
 if __name__ == "__main__":
     #Insert the name of the bucket where the logs will go
     logging_bucket = ""
+
     #Path to the file inside your root S3, containing all the buckets that will be monitored
     file_path = ""
+
     #The path to the root folder of the logs
     prefix = ""
+
+    #Configure the S3 lifecycle retention for all the monitored buckets
+    retention = 1 #Set to 1 day
+
     #Turn this value to 'True' if you already have log groups/streams created
     hasLogs = False
 
@@ -204,3 +223,4 @@ if __name__ == "__main__":
         create_folder(logging_bucket, f"{prefix}/{bucket_name}", s3_client)
         enable_logs(bucket_name, prefix, logging_bucket, s3_client)
         create_table(logging_bucket, bucket_name, prefix)
+    create_lifecycle(logging_bucket, bucket_names, prefix, retention)
