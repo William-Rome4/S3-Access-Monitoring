@@ -170,7 +170,7 @@ def enable_logs(root, prefix, target, client):
             'TargetPrefix': f"{prefix}/{bucket_name}/"
         }
     }
-    print(f"[S3] Enabling Access Logs for bucket: {bucket_name}"
+    print(f"[S3] Enabling Access Logs for bucket: {bucket_name}")
     try:
           client.put_bucket_logging(
               Bucket=root,
@@ -179,28 +179,29 @@ def enable_logs(root, prefix, target, client):
     except Exception as e:
           print(f"[FAIL] {e}")
 
-def create_lifecycle(log, names, prf, retention):
-	for b in names:
-		b = b.decode('utf-8').strip()
-		prefix = f"{prf}/{b}/"
-		lifecycle.append({'Expiration': {'Days': retention},'Filter': {'Prefix': prefix},'ID': b,'Status': 'Enabled',},)
-
-	s3.put_bucket_lifecycle_configuration(
-		Bucket=log,
-		LifecycleConfiguration={
-			'Rules': lifecycle,
-		},
-	)
+def create_lifecycle(log, names, prf, client, retention):
+    lifecycle = []
+    for b in names:
+        b = b.decode('utf-8').strip()
+        prefix = f"{prf}/{b}/"
+        lifecycle.append({'Expiration': {'Days': retention},'Filter': {'Prefix': prefix},'ID': b,'Status': 'Enabled',},)
+    
+    client.put_bucket_lifecycle_configuration(
+        Bucket=log,
+        LifecycleConfiguration={
+            'Rules': lifecycle,
+        },
+    )
 
 if __name__ == "__main__":
     #Insert the name of the bucket where the logs will go
-    logging_bucket = ""
+    logging_bucket = "unbh-dev-lake-logs"
 
     #Path to the file inside your root S3, containing all the buckets that will be monitored
-    file_path = ""
+    file_path = "testOneBucket.txt"
 
     #The path to the root folder of the logs
-    prefix = ""
+    prefix = "s3/access_logs"
 
     #Configure the S3 lifecycle retention for all the monitored buckets
     retention = 1 #Set to 1 day
@@ -215,7 +216,7 @@ if __name__ == "__main__":
         Key=file_path
     )
     bucket_names = bucket_names['Body'].readlines()
-
+    
     if hasLogs == False:
         create_cwlogs(logging_bucket, bucket_names)    
     for b in bucket_names:
@@ -223,4 +224,4 @@ if __name__ == "__main__":
         create_folder(logging_bucket, f"{prefix}/{bucket_name}", s3_client)
         enable_logs(bucket_name, prefix, logging_bucket, s3_client)
         create_table(logging_bucket, bucket_name, prefix)
-    create_lifecycle(logging_bucket, bucket_names, prefix, retention)
+    create_lifecycle(logging_bucket, bucket_names, prefix, s3_client, retention)
